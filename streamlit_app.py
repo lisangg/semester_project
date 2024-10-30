@@ -50,7 +50,19 @@ def load_data(start_date='2005-01-01', end_date=datetime.today(), symbol='GOOGL'
 @st.cache_data
 def get_tickers_name():
     return pd.read_csv("nasdaq_screener.csv")["Symbol"]
-        
+
+def display_fundamental_data(ticker_object):
+    
+    # get the fundamental data about the ticker performance today
+    metrics = ["previousClose", "open", "dayLow", "dayHigh"]
+    
+    columns = st.columns(len(metrics))
+    for (i, metric) in enumerate(metrics):
+        with columns[i]:
+            with st.container(border=True):
+                st.write(metric)
+                st.write(ticker_object.info[metric])
+               
 
 # visualizing functions
 def display_line_graph(symbol, data):
@@ -87,42 +99,62 @@ st.title("Stock Market Dashboard")
 
 
 # SIDE BAR
+def display_sidebar():
+    with st.sidebar:
+        st.header("Settings")
+        
+        min_date =  data.index.min().date()
+        max_date = data.index.max().date()
+        
+        start_date = st.date_input("Start date", min_date, min_value=min_date, max_value=max_date)
+        end_date = st.date_input("End date", max_date, min_value=min_date, max_value=max_date)
+        time_frame = st.selectbox("Select time frame",
+                                ("Daily", "Weekly", "Monthly", "Quarterly"),
+        )
+        chart_selection = st.selectbox("Select a chart type",
+                                    ("Bar", "Area"))
+        
+        symbol = st.selectbox("Select ticker symbol",
+                                    get_tickers_name())
+        
+def display_download_options():
+    # SEEING data and exporting option to csv file
+    with st.expander('View Original Data'):
+        st.dataframe(data)
+        
+        # st.download_button("Download Ticker Fundamental Data", data.to_csv(index=True), file_name=f"{symbol}_fundamental_data.csv", mime="text/csv")
+        st.download_button("Download Historical Stock Data", data.to_csv(index=True), file_name=f"{symbol}_stock_data.csv", mime="text/csv")
 
 with st.sidebar:
     st.header("Settings")
     
     min_date =  data.index.min().date()
     max_date = data.index.max().date()
-    
+        
     start_date = st.date_input("Start date", min_date, min_value=min_date, max_value=max_date)
     end_date = st.date_input("End date", max_date, min_value=min_date, max_value=max_date)
     time_frame = st.selectbox("Select time frame",
                               ("Daily", "Weekly", "Monthly", "Quarterly"),
-    )
+                              )
     chart_selection = st.selectbox("Select a chart type",
-                                   ("Bar", "Area"))
-    
+                                   ("Line graph", "Candlestick"))
+        
     symbol = st.selectbox("Select ticker symbol",
-                                   get_tickers_name())
-    
+                          get_tickers_name())
+             
 
 data = load_data(start_date, end_date, symbol)
+ticker_object = load_ticker()
+
+display_fundamental_data(ticker_object)
+
+if chart_selection == "Line graph":
+    display_line_graph(symbol, data)
+else:
+    display_candle_stick(symbol, data)
+    
+display_download_options()
 
 
-display_line_graph(symbol, data)
-display_candle_stick(symbol, data)
-
-# get the fundamental data about the ticker performance today
-columns = ["previousClose", "open", "dayLow", "dayHigh"]
-
-for col in columns:
-    with st.container(border=True):
-        st.write(ticker_object.info[col])
     
 
-# SEEING data and exporting option to csv file
-with st.expander('View Original Data'):
-    st.dataframe(data)
-    
-    # st.download_button("Download Ticker Fundamental Data", data.to_csv(index=True), file_name=f"{symbol}_fundamental_data.csv", mime="text/csv")
-    st.download_button("Download Historical Stock Data", data.to_csv(index=True), file_name=f"{symbol}_stock_data.csv", mime="text/csv")
