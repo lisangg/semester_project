@@ -60,8 +60,7 @@ def display_fundamental_data(ticker_object):
     for (i, metric) in enumerate(metrics):
         with columns[i]:
             with st.container(border=True):
-                st.write(metric)
-                st.write(ticker_object.info[metric])
+                st.metric(label=metric, value=ticker_object.info[metric])
                
 
 # visualizing functions
@@ -83,16 +82,44 @@ def display_candle_stick(symbol, data):
     # Display the figure
     st.plotly_chart(fig)
     
+def display_watch_list():
+## display watch list
+# using session state
+    with st.container(border=True):
 
+        st.subheader("Your Watchlist")
+        for stock in st.session_state['watchlist']:
+            with st.container(border=True):
+                col1, col2 = st.columns(2)
 
+                try:
+                    profitMargins = load_ticker(symbol).info['profitMargins']
+                except KeyError:
+                    profitMargins = "N/A"
+                    
+                    
+                with col1:
+                    st.write(load_ticker(symbol).info['shortName'])
+                    st.write(symbol)
+                
+                with col2:    
+                    st.write(profitMargins)
 
+                    if profitMargins >= 0:
+                        # change the color to green
+                        pass
+                    else:
+                        # chanage the color to red
+                        pass
+                
+
+# Initialization
+if 'watchlist' not in st.session_state:
+    st.session_state['watchlist'] = []
 
 # retreieve default data 
 
 data = load_data()
-
-
-
 
 
 st.title("Stock Market Dashboard")
@@ -125,6 +152,7 @@ def display_download_options():
         # st.download_button("Download Ticker Fundamental Data", data.to_csv(index=True), file_name=f"{symbol}_fundamental_data.csv", mime="text/csv")
         st.download_button("Download Historical Stock Data", data.to_csv(index=True), file_name=f"{symbol}_stock_data.csv", mime="text/csv")
 
+
 with st.sidebar:
     st.header("Settings")
     
@@ -141,6 +169,11 @@ with st.sidebar:
         
     symbol = st.selectbox("Select ticker symbol",
                           get_tickers_name())
+    
+    # allow user to add a stock to watch list
+    if st.button("Add to watchlist"):
+        if symbol not in st.session_state['watchlist']:
+            st.session_state['watchlist'].append(symbol)
              
 
 data = load_data(start_date, end_date, symbol)
@@ -153,8 +186,13 @@ if chart_selection == "Line graph":
 else:
     display_candle_stick(symbol, data)
     
+    
+display_watch_list()    
 display_download_options()
 
 
-    
+
+                
+                    
+
 
