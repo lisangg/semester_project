@@ -44,7 +44,7 @@ def load_data(start_date='2005-01-01', end_date=datetime.today(), symbol='GOOGL'
     # a function download data from yfinance
     
     data = yf.download(symbol, start_date, end_date)
-    
+    data.columns = ["Adj Close", "Close", "High", "Low", "Open", "Volume"]
     return data
 
 @st.cache_data
@@ -72,10 +72,10 @@ def display_candle_stick(symbol, data):
     
     # Plotting the candlestick chart with Plotly
     fig = go.Figure(data=[go.Candlestick(x=data.index,
-                                        open=data['Open'][symbol],
-                                        high=data['High'][symbol],
-                                        low=data['Low'][symbol],
-                                        close=data['Adj Close'][symbol])])
+                                        open=data['Open'],
+                                        high=data['High'],
+                                        low=data['Low'],
+                                        close=data['Adj Close'])])
 
     fig.update_layout(title=f'{symbol} Candlestick Chart', xaxis_title='Date', yaxis_title='Price')
 
@@ -119,10 +119,6 @@ if 'watchlist' not in st.session_state:
 
 # retreieve default data 
 
-data = load_data()
-
-
-st.title("Stock Market Dashboard")
 
 
 # SIDE BAR
@@ -144,6 +140,10 @@ def display_sidebar():
         symbol = st.selectbox("Select ticker symbol",
                                     get_tickers_name())
         
+def display_scatter_chart():
+    st.scatter_chart(data, x='Volume', y='Close', x_label="Volume", y_label="Closing price")
+
+        
 def display_download_options():
     # SEEING data and exporting option to csv file
     with st.expander('View Original Data'):
@@ -152,6 +152,9 @@ def display_download_options():
         # st.download_button("Download Ticker Fundamental Data", data.to_csv(index=True), file_name=f"{symbol}_fundamental_data.csv", mime="text/csv")
         st.download_button("Download Historical Stock Data", data.to_csv(index=True), file_name=f"{symbol}_stock_data.csv", mime="text/csv")
 
+data = load_data()
+st.title("Stock Market Dashboard")
+ticker_object = load_ticker()
 
 with st.sidebar:
     st.header("Settings")
@@ -175,9 +178,8 @@ with st.sidebar:
         if symbol not in st.session_state['watchlist']:
             st.session_state['watchlist'].append(symbol)
              
+    financial_metric = ticker_object.get_financials().index
 
-data = load_data(start_date, end_date, symbol)
-ticker_object = load_ticker()
 
 display_fundamental_data(ticker_object)
 
@@ -186,9 +188,27 @@ if chart_selection == "Line graph":
 else:
     display_candle_stick(symbol, data)
     
-    
+data = load_data(start_date, end_date, symbol)
+
+display_scatter_chart()
 display_watch_list()    
 display_download_options()
+
+
+
+# financial data
+financial_metrics = ticker_object.get_financials().index
+st.header('Financials')
+
+financial_metric = st.selectbox("Select financial metric",
+                          financial_metrics)
+
+# financials
+finacial_data = ticker_object.get_financials().loc[financial_metric].rename_axis('Date').reset_index()
+finacial_data['Year'] = [date.year for date in finacial_data['Date']]
+st.bar_chart(data=finacial_data, x='Year', y=financial_metric)
+
+
 
 
 
