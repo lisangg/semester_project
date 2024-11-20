@@ -7,8 +7,6 @@ import pandas as pd
 import seaborn as sns
 import plotly.graph_objects as go
 
-
-
 from datetime import datetime, timedelta
 
 
@@ -61,7 +59,6 @@ def display_fundamental_data(ticker_object):
         with columns[i]:
             with st.container(border=True):
                 st.metric(label=metric, value=ticker_object.info[metric])
-               
 
 # visualizing functions
 def display_line_graph(symbol, data):
@@ -81,44 +78,50 @@ def display_candle_stick(symbol, data):
 
     # Display the figure
     st.plotly_chart(fig)
+
+def display_scatter_chart(symbol, data):
+    st.scatter_chart(data, x='Volume', y='Close', x_label="Volume", y_label="Closing price")
+
+def display_trading_volume(data):
+    st.header("Trading Volume")
+    st.line_chart(data['Volume'], x_label='Date', y_label='Volume')
     
-def display_watch_list():
+def display_watch_list(watch_list):
 ## display watch list
 # using session state
     with st.container(border=True):
 
         st.subheader("Your Watchlist")
-        for stock in st.session_state['watchlist']:
+        for stock in watch_list:
             with st.container(border=True):
                 col1, col2 = st.columns(2)
-
-                try:
-                    profitMargins = load_ticker(symbol).info['profitMargins']
-                except KeyError:
-                    profitMargins = "N/A"
-                    
-                    
-                with col1:
-                    st.write(load_ticker(symbol).info['shortName'])
-                    st.write(symbol)
                 
-                with col2:    
-                    st.write(profitMargins)
-
+                with col1:
+                    st.write(load_ticker(stock).info['shortName'])
+                    st.write(stock)
+                    
+           
+                try:
+                    profitMargins = load_ticker(stock).info['profitMargins']
+                except:
+                    profitMargins = "N/A"
+                    col2.write("N/A")
+                    
+                else:
                     if profitMargins >= 0:
-                        # change the color to green
-                        pass
+                        col2.write(f":green[{profitMargins}]")
                     else:
-                        # chanage the color to red
-                        pass
+                        col2.write(f":red[{profitMargins}]")
+                    
+                
+                
+
+                    
                 
 
 # Initialization
 if 'watchlist' not in st.session_state:
     st.session_state['watchlist'] = []
-
-# retreieve default data 
-
 
 
 # SIDE BAR
@@ -140,11 +143,9 @@ def display_sidebar():
         symbol = st.selectbox("Select ticker symbol",
                                     get_tickers_name())
         
-def display_scatter_chart():
-    st.scatter_chart(data, x='Volume', y='Close', x_label="Volume", y_label="Closing price")
 
         
-def display_download_options():
+def display_download_options(data):
     # SEEING data and exporting option to csv file
     with st.expander('View Original Data'):
         st.dataframe(data)
@@ -152,15 +153,16 @@ def display_download_options():
         # st.download_button("Download Ticker Fundamental Data", data.to_csv(index=True), file_name=f"{symbol}_fundamental_data.csv", mime="text/csv")
         st.download_button("Download Historical Stock Data", data.to_csv(index=True), file_name=f"{symbol}_stock_data.csv", mime="text/csv")
 
-data = load_data()
+historical_data = load_data() # default data
+ticker_object = load_ticker() # default dadta
+
 st.title("Stock Market Dashboard")
-ticker_object = load_ticker()
 
 with st.sidebar:
     st.header("Settings")
     
-    min_date =  data.index.min().date()
-    max_date = data.index.max().date()
+    min_date =  historical_data.index.min().date()
+    max_date = historical_data.index.max().date()
         
     start_date = st.date_input("Start date", min_date, min_value=min_date, max_value=max_date)
     end_date = st.date_input("End date", max_date, min_value=min_date, max_value=max_date)
@@ -180,19 +182,22 @@ with st.sidebar:
              
     financial_metric = ticker_object.get_financials().index
 
+# load the new data
+historical_data = load_data(start_date, end_date, symbol)
 
 display_fundamental_data(ticker_object)
 
+# let user input desire chart
 if chart_selection == "Line graph":
-    display_line_graph(symbol, data)
+    display_line_graph(symbol, historical_data)
 else:
-    display_candle_stick(symbol, data)
+    display_candle_stick(symbol, historical_data)    
     
-data = load_data(start_date, end_date, symbol)
+# calling function
+display_watch_list(st.session_state["watchlist"])    
+display_trading_volume(historical_data)
+display_download_options(historical_data)
 
-display_scatter_chart()
-display_watch_list()    
-display_download_options()
 
 
 
@@ -213,6 +218,4 @@ st.bar_chart(data=finacial_data, x='Year', y=financial_metric)
 
 
                 
-                    
-
-
+                
