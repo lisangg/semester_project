@@ -6,9 +6,46 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import plotly.graph_objects as go
+import re
 
 from datetime import datetime, timedelta
 
+# Page configuration
+st.set_page_config(
+    page_title="Stock Dashboard",
+    layout="wide",
+    initial_sidebar_state="expanded")
+
+# CSS Styling
+
+st.markdown("""
+<style>
+[data-testid="stTitle"] {
+    align-items: center;
+}
+
+[data-testid="block-container"] {
+    padding-left: 2rem;
+    padding-right: 2rem;
+    padding-top: 1rem;
+    padding-bottom: 0rem;
+    margin-bottom: -7rem;
+}
+
+[data-testid="stMetricLabel"] {
+  display: flex;
+  font-weight: 900;
+  justify-content: center;
+  align-items: center;
+}
+
+[data-testid="stMetric"] {
+    background-color: #393939;
+    text-align: center;
+    padding: 15px 0;
+}
+</style>
+""", unsafe_allow_html=True)
 
 # decorator @st.cache_data and @st.cache_resource 
 #  store the results of expensive function calls and return the cached result when the same inputs occur again
@@ -53,28 +90,32 @@ def display_fundamental_data(ticker_object):
     
     # get the fundamental data about the ticker performance today
     metrics = ["previousClose", "open", "dayLow", "dayHigh"]
+    labels = ["Previous Close", "Open", "Low", "High"]
     
     columns = st.columns(len(metrics))
     for (i, metric) in enumerate(metrics):
         with columns[i]:
-            with st.container(border=True):
-                st.metric(label=metric, value=ticker_object.info[metric])
+            with st.container():
+                st.metric(label=labels[i], value=ticker_object.info[metric])
 
-# visualizing functions
-def display_line_graph(symbol, data):
-    st.subheader(F'{symbol} Closing Price')
+
+# Visualizing functions
+
+def display_line_graph(data):
+    st.subheader("Closing Price")
     st.line_chart(data['Adj Close'], x_label='Date', y_label='Closing Price')
 
-def display_candle_stick(symbol, data):
+def display_candle_stick(data):
     
     # Plotting the candlestick chart with Plotly
+    st.subheader("Candlestick Chart")
     fig = go.Figure(data=[go.Candlestick(x=data.index,
                                         open=data['Open'],
                                         high=data['High'],
                                         low=data['Low'],
                                         close=data['Adj Close'])])
 
-    fig.update_layout(title=f'{symbol} Candlestick Chart', xaxis_title='Date', yaxis_title='Price')
+    fig.update_layout(xaxis_title='Date', yaxis_title='Price')
 
     # Display the figure
     st.plotly_chart(fig)
@@ -96,53 +137,26 @@ def display_watch_list(watch_list):
             with st.container(border=True):
                 col1, col2 = st.columns(2)
                 
+                info = load_ticker(stock).info
+                
+                
                 with col1:
-                    st.write(load_ticker(stock).info['shortName'])
+                    st.write(info['shortName'])
                     st.write(stock)
                     
-           
-                try:
-                    profitMargins = load_ticker(stock).info['profitMargins']
-                except:
-                    profitMargins = "N/A"
-                    col2.write("N/A")
-                    
-                else:
-                    if profitMargins >= 0:
-                        col2.write(f":green[{profitMargins}]")
+                with col2:
+                    st.write(info['open'])
+                    growth = round(((info['open'] - info['previousClose'])/ info['previousClose']) * 100, 2)
+                    if growth >= 0:
+                        st.write(f":green[{growth}]")
                     else:
-                        col2.write(f":red[{profitMargins}]")
-                    
-                
-                
-
-                    
-                
+                        st.write(f":red[{growth}]")            
 
 # Initialization
 if 'watchlist' not in st.session_state:
     st.session_state['watchlist'] = []
 
 
-# SIDE BAR
-def display_sidebar():
-    with st.sidebar:
-        st.header("Settings")
-        
-        min_date =  data.index.min().date()
-        max_date = data.index.max().date()
-        
-        start_date = st.date_input("Start date", min_date, min_value=min_date, max_value=max_date)
-        end_date = st.date_input("End date", max_date, min_value=min_date, max_value=max_date)
-        time_frame = st.selectbox("Select time frame",
-                                ("Daily", "Weekly", "Monthly", "Quarterly"),
-        )
-        chart_selection = st.selectbox("Select a chart type",
-                                    ("Bar", "Area"))
-        
-        symbol = st.selectbox("Select ticker symbol",
-                                    get_tickers_name())
-        
 
         
 def display_download_options(data):
@@ -152,6 +166,10 @@ def display_download_options(data):
         
         # st.download_button("Download Ticker Fundamental Data", data.to_csv(index=True), file_name=f"{symbol}_fundamental_data.csv", mime="text/csv")
         st.download_button("Download Historical Stock Data", data.to_csv(index=True), file_name=f"{symbol}_stock_data.csv", mime="text/csv")
+
+
+######## PYTHON SCRIPT
+
 
 historical_data = load_data() # default data
 ticker_object = load_ticker() # default dadta
@@ -180,7 +198,6 @@ with st.sidebar:
         if symbol not in st.session_state['watchlist']:
             st.session_state['watchlist'].append(symbol)
              
-    financial_metric = ticker_object.get_financials().index
 
 # load the new data
 historical_data = load_data(start_date, end_date, symbol)
@@ -189,33 +206,32 @@ display_fundamental_data(ticker_object)
 
 # let user input desire chart
 if chart_selection == "Line graph":
-    display_line_graph(symbol, historical_data)
+    display_line_graph(historical_data)
 else:
-    display_candle_stick(symbol, historical_data)    
+    display_candle_stick(historical_data)    
     
 # calling function
 display_watch_list(st.session_state["watchlist"])    
 display_trading_volume(historical_data)
 display_download_options(historical_data)
 
-
-
-
 # financial data
 financial_metrics = ticker_object.get_financials().index
+
+# (?<![A-Z\W])  what precedes is a word character EXCEPT for capital letters
+#(?=[A-Z])     and what follows is a capital letter
+
+financial_metrics = [re.sub(r'(?<![A-Z\W])(?=[A-Z])', ' ', metric) for metric in financial_metrics]    
 st.header('Financials')
 
 financial_metric = st.selectbox("Select financial metric",
                           financial_metrics)
 
+financial_data = ticker_object.get_financials()
+financial_data.index = financial_metrics
+
+
 # financials
-finacial_data = ticker_object.get_financials().loc[financial_metric].rename_axis('Date').reset_index()
-finacial_data['Year'] = [date.year for date in finacial_data['Date']]
-st.bar_chart(data=finacial_data, x='Year', y=financial_metric)
-
-
-
-
-
-                
-                
+metric_data = financial_data.loc[financial_metric].rename_axis('Date').reset_index()
+metric_data['Year'] = [date.year for date in metric_data['Date']]
+st.bar_chart(data=metric_data, x='Year', y=financial_metric)
