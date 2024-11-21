@@ -6,9 +6,9 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import plotly.graph_objects as go
-import re
 
 from datetime import datetime, timedelta
+import re
 
 # Page configuration
 st.set_page_config(
@@ -20,9 +20,6 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-[data-testid="stTitle"] {
-    align-items: center;
-}
 
 [data-testid="block-container"] {
     padding-left: 2rem;
@@ -51,19 +48,19 @@ st.markdown("""
 #  store the results of expensive function calls and return the cached result when the same inputs occur again
 
 @st.cache_resource
-def load_ticker(ticker='MSFT'):
+def load_ticker(symbol):
     ''' load ticker object from yfinance
     
     Args:
-        ticker: ticker symbol for a stock, string
+        symbol: ticker symbol for a stock, string
     
     Returns:
         ticker object
     '''
-    return yf.Ticker(ticker)
+    return yf.Ticker(symbol)
 
 @st.cache_data
-def load_data(start_date='2005-01-01', end_date=datetime.today(), symbol='GOOGL'):
+def load_data(start_date, end_date, symbol):
     # docStrings for a function is created with triple-quotation marks
     ''' download data for a specific ticker from yfinance library
     
@@ -172,14 +169,26 @@ def display_download_options(data):
 
 ######## PYTHON SCRIPT
 
+st.title("Stock Dashboard")
 
-historical_data = load_data() # default data
-ticker_object = load_ticker() # default dadta
+default_start_date = '2005-01-01'
+default_end_date = datetime.today()
+default_symbol = 'GOOGL'
 
-st.title("Stock Market Dashboard")
+historical_data = load_data(default_start_date, default_end_date, default_symbol) # default data
+ticker_object = load_ticker(default_symbol) # default dadta
+
 
 with st.sidebar:
     st.header("Settings")
+    
+    symbol = st.selectbox("Select ticker symbol",
+                          get_tickers_name())
+    
+    # allow user to add a stock to watch list
+    if st.button("Add to watchlist"):
+        if symbol not in st.session_state['watchlist']:
+            st.session_state['watchlist'].append(symbol)
     
     min_date =  historical_data.index.min().date()
     max_date = historical_data.index.max().date()
@@ -192,17 +201,13 @@ with st.sidebar:
     chart_selection = st.selectbox("Select a chart type",
                                    ("Line graph", "Candlestick"))
         
-    symbol = st.selectbox("Select ticker symbol",
-                          get_tickers_name())
     
-    # allow user to add a stock to watch list
-    if st.button("Add to watchlist"):
-        if symbol not in st.session_state['watchlist']:
-            st.session_state['watchlist'].append(symbol)
+    
              
 
 # load the new data
 historical_data = load_data(start_date, end_date, symbol)
+ticker_object = load_ticker(symbol)
 
 display_fundamental_data(ticker_object)
 
