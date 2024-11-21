@@ -130,7 +130,7 @@ def display_trading_volume(data):
 def display_watch_list(watch_list):
 ## display watch list
 # using session state
-    with st.container(border=True):
+    with st.container():
 
         st.subheader("Your Watchlist")
         for stock in watch_list:
@@ -157,6 +157,8 @@ if 'watchlist' not in st.session_state:
     st.session_state['watchlist'] = []
 
 
+def display_financial_metric(data, financial_metric):
+    st.bar_chart(data=data, x='Year', y=financial_metric)
 
         
 def display_download_options(data):
@@ -211,9 +213,24 @@ else:
     display_candle_stick(historical_data)    
     
 # calling function
-display_watch_list(st.session_state["watchlist"])    
-display_trading_volume(historical_data)
+
+col1, col2 = st.columns([2.5,1])
+with col1:
+    display_trading_volume(historical_data)
+     
+with col2:  
+    display_watch_list(st.session_state["watchlist"]) 
+    
 display_download_options(historical_data)
+
+
+
+
+
+
+
+# financials
+st.header('Financials')
 
 # financial data
 financial_metrics = ticker_object.get_financials().index
@@ -222,16 +239,12 @@ financial_metrics = ticker_object.get_financials().index
 #(?=[A-Z])     and what follows is a capital letter
 
 financial_metrics = [re.sub(r'(?<![A-Z\W])(?=[A-Z])', ' ', metric) for metric in financial_metrics]    
-st.header('Financials')
 
 financial_metric = st.selectbox("Select financial metric",
                           financial_metrics)
 
 financial_data = ticker_object.get_financials()
 financial_data.index = financial_metrics
-
-
-# financials
 metric_data = financial_data.loc[financial_metric].rename_axis('Date').reset_index()
 metric_data['Year'] = [date.year for date in metric_data['Date']]
-st.bar_chart(data=metric_data, x='Year', y=financial_metric)
+display_financial_metric(metric_data, financial_metric)
