@@ -13,6 +13,7 @@ import re
 # Page configuration
 st.set_page_config(
     page_title="Stock Dashboard",
+    page_icon=":bar_chart:",
     layout="wide",
     initial_sidebar_state="expanded")
 
@@ -37,10 +38,15 @@ st.markdown("""
 }
 
 [data-testid="stMetric"] {
-    background-color: #393939;
     text-align: center;
     padding: 15px 0;
 }
+
+[data-testid="stMetricDelta"] svg {
+    transform: translateX(40px);
+    }
+}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -83,6 +89,20 @@ def load_data(start_date, end_date, symbol):
 def get_tickers_name():
     return pd.read_csv("nasdaq_screener.csv")["Symbol"]
 
+def load_financial_data(ticker_object):
+    financial_data = ticker_object.get_financials()
+    financial_metrics = ticker_object.get_financials().index
+    # split the string according to capitalize letters with preceding word character
+
+    # (?<![A-Z\W])  what precedes is a word character EXCEPT for capital letters
+    #(?=[A-Z])     and what follows is a capital letter
+
+    financial_metrics = [re.sub(r'(?<![A-Z\W])(?=[A-Z])', ' ', metric) for metric in financial_metrics]    
+
+    # replaced index with the new strings
+    financial_data.index = financial_metrics
+    return financial_data
+    
 def display_fundamental_data(ticker_object):
     
     # get the fundamental data about the ticker performance today
@@ -138,30 +158,26 @@ def display_watch_list(watch_list):
                 
                 
                 with col1:
+                    st.write("")
                     st.write(info['shortName'])
-                    st.write(stock)
+                    st.subheader(stock)
                     
                 with col2:
-                    st.write(info['open'])
-                    growth = round(((info['open'] - info['previousClose'])/ info['previousClose']) * 100, 2)
-                    if growth >= 0:
-                        st.write(f":green[{growth}]")
-                    else:
-                        st.write(f":red[{growth}]")            
+                    change = round(((info['open'] - info['previousClose'])/ info['previousClose']) * 100, 2)
+                    st.metric("Open", info['open'], change)       
 
-# Initialization
-if 'watchlist' not in st.session_state:
-    st.session_state['watchlist'] = []
+def display_financial_metric(financial_data, financial_metric):
+    
+    metric_data = financial_data.loc[financial_metric].rename_axis('Date').reset_index()
+    metric_data['Year'] = [date.year for date in metric_data['Date']]
 
-
-def display_financial_metric(data, financial_metric):
-    st.bar_chart(data=data, x='Year', y=financial_metric)
+    st.bar_chart(data=metric_data, x='Year', y=financial_metric)
 
         
 def display_download_options(data):
     # SEEING data and exporting option to csv file
     with st.expander('View Original Data'):
-        st.dataframe(data)
+        st.dataframe(data, use_container_width=True)
         
         # st.download_button("Download Ticker Fundamental Data", data.to_csv(index=True), file_name=f"{symbol}_fundamental_data.csv", mime="text/csv")
         st.download_button("Download Historical Stock Data", data.to_csv(index=True), file_name=f"{symbol}_stock_data.csv", mime="text/csv")
@@ -169,19 +185,18 @@ def display_download_options(data):
 
 ######## PYTHON SCRIPT
 
-st.title("Stock Dashboard")
+# initialize a list for symbols in user watch list
+# session state will store variables for each user session (values stay the same after rerun)
 
-default_start_date = '2005-01-01'
-default_end_date = datetime.today()
-default_symbol = 'GOOGL'
-
-historical_data = load_data(default_start_date, default_end_date, default_symbol) # default data
-ticker_object = load_ticker(default_symbol) # default dadta
+if 'watchlist' not in st.session_state:
+    st.session_state['watchlist'] = []
 
 
+# side bar
 with st.sidebar:
     st.header("Settings")
     
+    # select symbol
     symbol = st.selectbox("Select ticker symbol",
                           get_tickers_name())
     
@@ -190,66 +205,54 @@ with st.sidebar:
         if symbol not in st.session_state['watchlist']:
             st.session_state['watchlist'].append(symbol)
     
-    min_date =  historical_data.index.min().date()
-    max_date = historical_data.index.max().date()
+    # set date range
+    min_date = datetime.strptime('01-01-2005', '%m-%d-%Y')
+    max_date = datetime.today()
         
+    # select date range
     start_date = st.date_input("Start date", min_date, min_value=min_date, max_value=max_date)
     end_date = st.date_input("End date", max_date, min_value=min_date, max_value=max_date)
-    time_frame = st.selectbox("Select time frame",
-                              ("Daily", "Weekly", "Monthly", "Quarterly"),
-                              )
-    chart_selection = st.selectbox("Select a chart type",
-                                   ("Line graph", "Candlestick"))
-        
     
+    # load data for selected symbol and selected time range
+    historical_data = load_data(start_date, end_date, symbol)
+    ticker_object = load_ticker(symbol)
+    financial_data = load_financial_data(ticker_object)
+
+    # select chart type
+    chart_selection = st.selectbox("Select a chart type", ("Line graph", "Candlestick"))
     
-             
+    financial_metric = st.selectbox("Select financial metric", financial_data.index)
+    
 
-# load the new data
-historical_data = load_data(start_date, end_date, symbol)
-ticker_object = load_ticker(symbol)
 
+# python script 
+
+st.title("📈 Stock Dashboard")
+st.subheader(f"Currently showing: {symbol}")
+
+# show the fundamental data
 display_fundamental_data(ticker_object)
 
-# let user input desire chart
+# show chart according to user preference
 if chart_selection == "Line graph":
     display_line_graph(historical_data)
 else:
     display_candle_stick(historical_data)    
-    
-# calling function
 
-col1, col2 = st.columns([2.5,1])
+col1, col2 = st.columns([2,1])
+# show trading volume
 with col1:
     display_trading_volume(historical_data)
-     
+    
+# show watch list
 with col2:  
     display_watch_list(st.session_state["watchlist"]) 
     
 display_download_options(historical_data)
 
-
-
-
-
-
-
-# financials
+# financials section
 st.header('Financials')
 
-# financial data
-financial_metrics = ticker_object.get_financials().index
-
-# (?<![A-Z\W])  what precedes is a word character EXCEPT for capital letters
-#(?=[A-Z])     and what follows is a capital letter
-
-financial_metrics = [re.sub(r'(?<![A-Z\W])(?=[A-Z])', ' ', metric) for metric in financial_metrics]    
-
-financial_metric = st.selectbox("Select financial metric",
-                          financial_metrics)
-
-financial_data = ticker_object.get_financials()
-financial_data.index = financial_metrics
-metric_data = financial_data.loc[financial_metric].rename_axis('Date').reset_index()
-metric_data['Year'] = [date.year for date in metric_data['Date']]
-display_financial_metric(metric_data, financial_metric)
+# show financial data
+st.subheader(f"Financial Metric: {financial_metric}")
+display_financial_metric(financial_data, financial_metric)
