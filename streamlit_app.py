@@ -65,8 +65,7 @@ def load_ticker(symbol):
     '''
     return yf.Ticker(symbol)
 
-@st.cache_data
-def load_data(start_date, end_date, symbol):
+def load_historical_data(ticker_object, start_date, end_date, interval):
     # docStrings for a function is created with triple-quotation marks
     ''' download data for a specific ticker from yfinance library
     
@@ -81,8 +80,7 @@ def load_data(start_date, end_date, symbol):
 
     # a function download data from yfinance
     
-    data = yf.download(symbol, start_date, end_date)
-    data.columns = ["Adj Close", "Close", "High", "Low", "Open", "Volume"]
+    data = ticker_object.history(start=start_date, end=end_date, interval=interval)
     return data
 
 @st.cache_data
@@ -120,7 +118,7 @@ def display_fundamental_data(ticker_object):
 
 def display_line_graph(data):
     st.subheader("Closing Price")
-    st.line_chart(data['Adj Close'], x_label='Date', y_label='Closing Price')
+    st.line_chart(data['Close'], x_label='Date', y_label='Closing Price')
 
 def display_candle_stick(data):
     
@@ -130,15 +128,12 @@ def display_candle_stick(data):
                                         open=data['Open'],
                                         high=data['High'],
                                         low=data['Low'],
-                                        close=data['Adj Close'])])
+                                        close=data['Close'])])
 
     fig.update_layout(xaxis_title='Date', yaxis_title='Price')
 
     # Display the figure
     st.plotly_chart(fig)
-
-def display_scatter_chart(symbol, data):
-    st.scatter_chart(data, x='Volume', y='Close', x_label="Volume", y_label="Closing price")
 
 def display_trading_volume(data):
     st.header("Trading Volume")
@@ -212,10 +207,11 @@ with st.sidebar:
     # select date range
     start_date = st.date_input("Start date", min_date, min_value=min_date, max_value=max_date)
     end_date = st.date_input("End date", max_date, min_value=min_date, max_value=max_date)
+    interval = st.selectbox("Select time internval", ("1d", "5d", "1wk", "1mo", "3mo"))
     
     # load data for selected symbol and selected time range
-    historical_data = load_data(start_date, end_date, symbol)
     ticker_object = load_ticker(symbol)
+    historical_data = load_historical_data(ticker_object, start_date, end_date, interval)
     financial_data = load_financial_data(ticker_object)
 
     # select chart type
